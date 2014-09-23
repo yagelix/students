@@ -32,9 +32,7 @@ struct _Labyrinth {
 };
 
 struct _Path {
-	int p_x[MAX_HEIGHT*MAX_WIDTH];
-	int p_y[MAX_HEIGHT*MAX_WIDTH];
-	int length;
+	char* cells[MAX_HEIGHT*MAX_WIDTH];
 };
 
 typedef struct _Labyrinth Labyrinth;
