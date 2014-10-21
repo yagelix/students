@@ -45,6 +45,7 @@ int read_labyrinth(Labyrinth **l);
 
 int print_labyrinth(Labyrinth* l);
 
+void coords_from_addr(Labyrinth*l, char* addr, int* c, int* r);
 
 void free_labyrinth(Labyrinth* l);
 
@@ -126,9 +127,9 @@ int update_front(char* old_front[], char* new_front[], Labyrinth* l, int* step) 
 	char **of = old_front;
 	char **nf = new_front;
 	while (*of) {
-		fprintf(stderr, "Going front %p\n", *of);
-		int c = (*of - (char*)l->cells) % MAX_WIDTH;
-		int r = (*of - (char*)l->cells) / MAX_WIDTH;
+		int c, r;
+		coords_from_addr(l, *of, &c, &r);
+		
 		FrontWalkerData fwdata;
 		fwdata.step = step;
 		fwdata.nf = &nf;
@@ -143,6 +144,43 @@ int update_front(char* old_front[], char* new_front[], Labyrinth* l, int* step) 
 	return 1;
 }
 
+void coords_from_addr(Labyrinth*l, char* addr, int* c, int* r) {
+	*c = (addr - (char*)l->cells) % MAX_WIDTH;
+	*r = (addr - (char*)l->cells) / MAX_WIDTH;
+}
+
+
+int go_path(Labyrinth* l, char*** path_element) {
+	int current_step = 0;
+	if (**path_element) {
+		int cell_value = ***path_element;
+		if ( cell_vallue < 0 || cell_value == 3 ) {
+			int c,r;
+			current_step = cell_value < 0 ? -cell_value : 0;
+			PathFinderData pfdata;
+			pfdata.path_found = 0;
+
+			coords_from_addr(l, **path_element, &c, &r);
+	
+			if (!cell_walk(l, c, r, path_finder, &pfdata))
+				return 1;
+
+
+		} else if ( cell_value == 1 ) {
+			/* error, we are at wall! */
+			return 0;
+		} else if ( cell_value == 2 ) {
+			/* we're at  enter, finishing recursion */
+			return 1; /* success */
+		} else if ( cell_value == 3 ) 
+					} else {
+			
+		}
+	}
+
+
+}
+
 int update_path(Labyrinth* l, Path* p) {
 	int r,c;
 	int dc, dr;
@@ -150,6 +188,7 @@ int update_path(Labyrinth* l, Path* p) {
 	r = l->out_y;
 	c = l->out_x;
 
+	
 
 
 	for (dc = c-1; dc < c+2; dc++ ) {
