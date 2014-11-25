@@ -3,7 +3,7 @@
 
 
 int _stmt_printout(Statement stmt, void* data) {
-	printf("<%s, %s, %s, %s>\n", stmt[0], stmt[1], stmt[2], stmt[3]);
+	printf("<%ls, %ls, %ls, %ls>\n", stmt[0], stmt[1], stmt[2], stmt[3]);
 	return 1;
 }
 
@@ -27,14 +27,13 @@ int main(int argc, char* argv[]) {
 		if ( err ) {
 			return -2;
 		}
-		stmt_init(&mask, "A", NULL, NULL, NULL);
+		stmt_init(&mask, L"A", NULL, NULL, NULL);
 		err = tst_get(st, mask, _stmt_printout, NULL);
-
 
 		if ( err ) return -4;
 
 		count = 0;
-		stmt_init(&mask, "A", NULL, NULL, NULL);
+		stmt_init(&mask, L"A", NULL, NULL, NULL);
 		err = tst_get(st, mask, _stmt_counter, (void*)&count);
 		if ( err )  return -5;
 

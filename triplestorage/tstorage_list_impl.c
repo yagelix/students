@@ -4,13 +4,14 @@
 #include <string.h>
 #include <stdarg.h>
 #include <wchar.h>
+#include <locale.h>
 
-void logerr(const wchar_t* err, ...) {
+void logerr(const char* err, ...) {
 	va_list ap;
 	va_start(ap, err);
-	vfwprintf(stderr, err, ap);
+	vfprintf(stderr, err, ap);
 	va_end(ap);
-	fwprintf(stderr, L"\n");
+	fprintf(stderr, "\n");
 }
 
 typedef struct _stmt {
@@ -74,9 +75,9 @@ int _read_word(wchar_t* buf, FILE* f) {
 	long pos = ftell(f);
 	while (!feof(f)) {
 		wint_t c = fgetwc(f);
-		logerr(L"Reading sym '%lc'", c);
+		//logerr("Читаем sym '%x'", c);
 		if ( iswalnum(c) ) {
-			logerr(L"Is alnum");
+			//logerr("Is alnum");
 			*buf = c;
 			buf++;
 		} else if (iswspace(c)) {
@@ -104,7 +105,7 @@ int _read_quote(FILE* f) {
 	if ( ( x = fgetwc(f)) == L'\"') {
 		return 0;
 	}
-	logerr(L"Cannot read quote: '%c'", x);
+	logerr("Cannot read quote: '%lc'", x);
 	fseek(f, pos, SEEK_SET);
 	return -2;
 
@@ -188,7 +189,7 @@ int _read_qstring(wchar_t* buf, FILE* f) {
 int _read_term(wchar_t* buf, FILE* f) {
 	long pos = ftell(f);
 	if (_read_word(buf, f)) {
-		logerr(L"Unable to read word at %ld, trying qstring", pos);
+		logerr("Unable to read word at %ld, trying qstring", pos);
 		if (_read_qstring(buf, f)) {
 			fseek(f, pos, SEEK_SET);
 			return -4;
@@ -205,7 +206,7 @@ int _read_statement(_Statement** st, FILE* f) {
 
 	for (k = 0; k < STATEMENT_SIZE; k++ ){
 		if ( _read_term(buf, f) ) {
-			logerr(L"Cannot read term at pos %ld", ftell(f));
+			logerr("Cannot read term at pos %ld", ftell(f));
 			_stmt_destroy(*st, 1);
 			return -1;
 		}
@@ -217,17 +218,17 @@ int _read_statement(_Statement** st, FILE* f) {
 int tst_open(TStorage* ts, const char* filename) {
 	FILE* f;
 	_Statement** current = &ts->statements;
-
-	f = fopen(filename, "r");
+	char *locale = setlocale(LC_CTYPE, "ru_RU.UTF-8");
+	f = fopen(filename, "rb");
 
 	if ( !f ) {
-		logerr(L"Cannot open file");
+		logerr("Cannot open file");
 		return -1;
 	}
-		
+	fwide(f, 0);		
 	while(!feof(f)) {
 		if (_read_statement(current, f)) {
-			logerr(L"Cannot read statement at pos %ld", ftell(f));
+			logerr("Cannot read statement at pos %ld", ftell(f));
 			return -2;
 		}
 		current = &(*current)->next;
@@ -240,13 +241,13 @@ int _write_term_escaped(const wchar_t* term, FILE* f) {
 	fwprintf(f, L"\"");
 	for(k = term; *k; k++ ) {
 		if ( *k == '\\' || *k == '\"' ) {
-			fwprintf(f, L"\\%c", *k);	
+			fwprintf(f, L"\\%lc", *k);	
 		} else if (*k == '\n' ) {
 			fwprintf(f, L"\\n");
 		} else if (*k == '\r') {
 			fwprintf(f, L"\\r");
 		} else {
-			fwprintf(f, L"%c", *k);
+			fwprintf(f, L"%lc", *k);
 		}
 	}
 	fwprintf(f, L"\"");
@@ -263,7 +264,7 @@ int _write_term(const wchar_t* term, FILE* f) {
 	     }
      	}
 	if (fwprintf(f, term) != wcslen(term)) {
-		logerr(L"Cannot write term '%s'", term);
+		logerr("Cannot write term '%s'", term);
 		return -5;
 	}
 	return 0;
@@ -276,18 +277,18 @@ int _write_statement(_Statement* stmt, FILE* f) {
 		for(i = 0; i < STATEMENT_SIZE; i++ ) {
 			if (i != 0 ) {
 				if ( fwprintf(f, L" ") != 1)  {
-					logerr(L"Cannot write whitespace");
+					logerr("Cannot write whitespace");
 					return -5;
 				}
 			}
 
 			if ( _write_term(stmt->term[i], f)){
-				logerr(L"Cannot write term %d", i);
+				logerr("Cannot write term %d", i);
 				return -1;
 			}
 		}
 		if ( fwprintf(f, L"\n") != 1) {
-			logerr(L"Cannot finish statement");
+			logerr("Cannot finish statement");
 			return -6;
 		}
 		return _write_statement(stmt->next, f);
@@ -303,7 +304,7 @@ int tst_save(TStorage* ts, const char* filename) {
 	_Statement* current = ts->statements;
 	f = fopen(filename, "w+");
 	if ( !f ) {
-		logerr(L"Cannot open file for write");
+		logerr("Cannot open file for write");
 		return -1;
 	}
 	err = _write_statement(current, f);
@@ -385,7 +386,7 @@ int tst_get(TStorage* ts, Statement mask, StatementResult rs, void* data) {
 
 }	
 int tst_destroy(TStorage* ts) { 
-	logerr(L"Triple storage destroyed");
+	logerr("Triple storage destroyed");
 	_stmt_destroy(ts->statements, 1);
 	free(ts);
 	return 0;
