@@ -25,13 +25,13 @@ int main() {
 	
 	__log("Creating test statements");
 	
-	stmt_init(&stmt, "A", "Mama", "myla", "ramu");
+	stmt_init(&stmt, L"A", L"Mama", L"myla", L"ramu");
 	
 	if ((err = tst_set(st,  stmt))) {
 		__log ( "Error while setting %d", err);
 	}
 
-	stmt_init(&stmt, "A", "rama", "byla", "Very white");
+	stmt_init(&stmt, L"A", L"rama", L"byla", L"Very white");
 	if ((err = tst_set(st, stmt))) {
 		__log ( "Error while setting %d", err);
 	}
