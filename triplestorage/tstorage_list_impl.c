@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
-
+#include <wchar.h>
 
 void logerr(const char* err, ...) {
 	va_list ap;
@@ -30,7 +30,6 @@ void stmt_init(Statement* stmt, ...) {
 	for(k =0; k < STATEMENT_SIZE; k++) {
 		(*stmt)[k] = va_arg(ap, char *);
 	}
-
 	va_end(ap);
 }
 
@@ -60,15 +59,15 @@ int tst_init(TStorage** ts) {
 	return 0;
 }
 
-void _stmt_destroy(_Statement* stmt) {
+void _stmt_destroy(_Statement* stmt, int destroy_next) {
 	int k;
 	_Statement* next = stmt->next;
 	for ( k = 0; k < STATEMENT_SIZE; k++ ){
 		free(stmt->term[k]);
 	}
 	free(stmt);
-	if ( next ) 
-		_stmt_destroy(next);
+	if ( next  && destroy_next) 
+		_stmt_destroy(next, 1);
 }
 
 int _read_word(char* buf, FILE* f) {
@@ -185,6 +184,7 @@ int _read_qstring(char* buf, FILE* f) {
 int _read_term(char* buf, FILE* f) {
 	long pos = ftell(f);
 	if (_read_word(buf, f)) {
+		logerr("Unable to read word at %ld, trying qstring", pos);
 		if (_read_qstring(buf, f)) {
 			fseek(f, pos, SEEK_SET);
 			return -4;
@@ -201,7 +201,8 @@ int _read_statement(_Statement** st, FILE* f) {
 
 	for (k = 0; k < STATEMENT_SIZE; k++ ){
 		if ( _read_term(buf, f) ) {
-			_stmt_destroy(*st);
+			logerr("Cannot read term at pos %ld", ftell(f));
+			_stmt_destroy(*st, 1);
 			return -1;
 		}
 		(*st)->term[k] = strdup(buf);
@@ -222,7 +223,7 @@ int tst_open(TStorage* ts, const char* filename) {
 		
 	while(!feof(f)) {
 		if (_read_statement(current, f)) {
-			logerr("Cannot read statement");
+			logerr("Cannot read statement at pos %ld", ftell(f));
 			return -2;
 		}
 		current = &(*current)->next;
@@ -330,15 +331,16 @@ int _insert_statement(_Statement** cur, Statement stmt) {
 
 int _remove_statement(_Statement** cur, Statement stmt) {
 	if ( *cur) { 
-		int k;
 		_Statement** next = &(*cur)->next;
+		fprintf(stderr, "Removing statement <%s, %s, %s, %s> \n", (*cur)->term[0], (*cur)->term[1], (*cur)->term[2], (*cur)->term[3]);
 		if ( !stmt_match(*cur, stmt) ) {
 			// at least one term differ -> skip
-			return _remove_statement(&(*cur)->next, stmt);
+			return _remove_statement(next, stmt);
 		}
 		// all terms either masked or equal -> remove
+		_stmt_destroy(*cur, 0);		
 		*cur = *next;
-		return _remove_statement(next, stmt);
+		return _remove_statement(cur, stmt);
 	}
 	return 0;
 }
@@ -380,7 +382,7 @@ int tst_get(TStorage* ts, Statement mask, StatementResult rs, void* data) {
 }	
 int tst_destroy(TStorage* ts) { 
 	logerr("Triple storage destroyed");
-	_stmt_destroy(ts->statements);
+	_stmt_destroy(ts->statements, 1);
 	free(ts);
 	return 0;
 }
