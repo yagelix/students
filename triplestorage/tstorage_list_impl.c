@@ -5,16 +5,16 @@
 #include <stdarg.h>
 #include <wchar.h>
 
-void logerr(const char* err, ...) {
+void logerr(const wchar_t* err, ...) {
 	va_list ap;
 	va_start(ap, err);
-	vfprintf(stderr, err, ap);
+	vfwprintf(stderr, err, ap);
 	va_end(ap);
-	fprintf(stderr, "\n");
+	fwprintf(stderr, L"\n");
 }
 
 typedef struct _stmt {
-	char* term[STATEMENT_SIZE];
+	wchar_t* term[STATEMENT_SIZE];
 	struct _stmt* next;
 } _Statement;
 
@@ -28,7 +28,7 @@ void stmt_init(Statement* stmt, ...) {
 	int k = 0;
 	va_start(ap, stmt);
 	for(k =0; k < STATEMENT_SIZE; k++) {
-		(*stmt)[k] = va_arg(ap, char *);
+		(*stmt)[k] = va_arg(ap, wchar_t *);
 	}
 	va_end(ap);
 }
@@ -36,7 +36,7 @@ void stmt_init(Statement* stmt, ...) {
 int stmt_match(_Statement* stmt, Statement mask) {
 	int k;
 	for (k = 0; k < STATEMENT_SIZE; k++ ){
-		if ( mask[k] && strcmp(stmt->term[k], mask[k])) 
+		if ( mask[k] && wcscmp(stmt->term[k], mask[k])) 
 			return 0;
 	}
 	return 1;				
@@ -70,14 +70,16 @@ void _stmt_destroy(_Statement* stmt, int destroy_next) {
 		_stmt_destroy(next, 1);
 }
 
-int _read_word(char* buf, FILE* f) {
+int _read_word(wchar_t* buf, FILE* f) {
 	long pos = ftell(f);
 	while (!feof(f)) {
-		int c = fgetc(f);
-		if ( isalnum(c) ) {
+		wint_t c = fgetwc(f);
+		logerr(L"Reading sym '%lc'", c);
+		if ( iswalnum(c) ) {
+			logerr(L"Is alnum");
 			*buf = c;
 			buf++;
-		} else if (isspace(c)) {
+		} else if (iswspace(c)) {
 			*buf = 0;
 			return 0;
 		} else {
@@ -95,21 +97,23 @@ int _read_word(char* buf, FILE* f) {
 
 int _read_quote(FILE* f) {
 	long pos = ftell(f);
+	wint_t x;
 	if ( feof(f) ){
 		return -1;
 	}
-	if ( fgetc(f) == '\"') {
+	if ( ( x = fgetwc(f)) == L'\"') {
 		return 0;
 	}
+	logerr(L"Cannot read quote: '%c'", x);
 	fseek(f, pos, SEEK_SET);
 	return -2;
 
 }
 
-int _read_nonescaped(char** buf, FILE* f) {
-	int c = fgetc(f);
-	if ( c == '\\' ) {
-		ungetc(c, f);
+int _read_nonescaped(wchar_t** buf, FILE* f) {
+	wint_t c = fgetwc(f);
+	if ( c == L'\\' ) {
+		ungetwc(c, f);
 		return  -1;
 	} else {
 		**buf = c;
@@ -118,30 +122,30 @@ int _read_nonescaped(char** buf, FILE* f) {
 	return 0;
 }
 
-int _read_escaped(char** buf, FILE* f) {
-	int c = fgetc(f);
+int _read_escaped(wchar_t** buf, FILE* f) {
+	wint_t c = fgetwc(f);
 	if ( feof(f) ) {
 		return -2;
 	}
-	if( c != '\\') {
-		ungetc(c, f);
+	if( c != L'\\') {
+		ungetwc(c, f);
 		return -1;
 	}
 	
-	c = fgetc(f);
+	c = fgetwc(f);
 	if ( feof(f)) {
 		return -3;
 	}
 
 	switch (c) {
-	case 't': 
-		**buf = '\t';
+	case L't': 
+		**buf = L'\t';
 		break;
-	case 'n': 
-		**buf = '\n';
+	case L'n': 
+		**buf = L'\n';
 		break;
-	case 'r':
-		**buf = '\r';
+	case L'r':
+		**buf = L'\r';
 		break;
 	default:
 		**buf = c;
@@ -150,14 +154,14 @@ int _read_escaped(char** buf, FILE* f) {
 	return 0;
 }
 
-int _read_until_quote(char* buf, FILE* f) {
+int _read_until_quote(wchar_t* buf, FILE* f) {
 	
-	int c;
+	wint_t c;
 	long pos = ftell(f);
-	c = fgetc(f);
-	if (c == '\"') 
+	c = fgetwc(f);
+	if (c == L'\"') 
 		return 0;
-	ungetc(c, f);
+	ungetwc(c, f);
 	if ( _read_nonescaped(&buf, f) ) {
 		if ( _read_escaped(&buf, f) ) {
 			fseek(f, pos, SEEK_SET);
@@ -168,7 +172,7 @@ int _read_until_quote(char* buf, FILE* f) {
 	
 }
 
-int _read_qstring(char* buf, FILE* f) {
+int _read_qstring(wchar_t* buf, FILE* f) {
 	long pos = ftell(f);
 	if (_read_quote(f)) 
 		return -6;
@@ -181,10 +185,10 @@ int _read_qstring(char* buf, FILE* f) {
 }
 
 
-int _read_term(char* buf, FILE* f) {
+int _read_term(wchar_t* buf, FILE* f) {
 	long pos = ftell(f);
 	if (_read_word(buf, f)) {
-		logerr("Unable to read word at %ld, trying qstring", pos);
+		logerr(L"Unable to read word at %ld, trying qstring", pos);
 		if (_read_qstring(buf, f)) {
 			fseek(f, pos, SEEK_SET);
 			return -4;
@@ -195,17 +199,17 @@ int _read_term(char* buf, FILE* f) {
 
 int _read_statement(_Statement** st, FILE* f) {
 	int k;
-	char buf[4096];
+	wchar_t buf[4096];
 	*st = (_Statement*)malloc(sizeof(_Statement));
 	memset(*st, 0, sizeof(_Statement));
 
 	for (k = 0; k < STATEMENT_SIZE; k++ ){
 		if ( _read_term(buf, f) ) {
-			logerr("Cannot read term at pos %ld", ftell(f));
+			logerr(L"Cannot read term at pos %ld", ftell(f));
 			_stmt_destroy(*st, 1);
 			return -1;
 		}
-		(*st)->term[k] = strdup(buf);
+		(*st)->term[k] = wcsdup(buf);
 	}
 	return 0;
 }
@@ -217,13 +221,13 @@ int tst_open(TStorage* ts, const char* filename) {
 	f = fopen(filename, "r");
 
 	if ( !f ) {
-		logerr("Cannot open file");
+		logerr(L"Cannot open file");
 		return -1;
 	}
 		
 	while(!feof(f)) {
 		if (_read_statement(current, f)) {
-			logerr("Cannot read statement at pos %ld", ftell(f));
+			logerr(L"Cannot read statement at pos %ld", ftell(f));
 			return -2;
 		}
 		current = &(*current)->next;
@@ -231,35 +235,35 @@ int tst_open(TStorage* ts, const char* filename) {
 	return 0;
 }
 
-int _write_term_escaped(const char* term, FILE* f) {
-	const char *k;
-	fprintf(f, "\"");
+int _write_term_escaped(const wchar_t* term, FILE* f) {
+	const wchar_t *k;
+	fwprintf(f, L"\"");
 	for(k = term; *k; k++ ) {
 		if ( *k == '\\' || *k == '\"' ) {
-			fprintf(f, "\\%c", *k);	
+			fwprintf(f, L"\\%c", *k);	
 		} else if (*k == '\n' ) {
-			fprintf(f, "\\n");
+			fwprintf(f, L"\\n");
 		} else if (*k == '\r') {
-			fprintf(f, "\\r");
+			fwprintf(f, L"\\r");
 		} else {
-			fprintf(f, "%c", *k);
+			fwprintf(f, L"%c", *k);
 		}
 	}
-	fprintf(f, "\"");
+	fwprintf(f, L"\"");
 	return 0;
 		
 }
 
-int _write_term(const char* term, FILE* f) {
-	const char* k;
+int _write_term(const wchar_t* term, FILE* f) {
+	const wchar_t* k;
 	for (k = term; *k; k++ ) {
-	     if (isspace(*k) || *k == '\\' || *k=='\"' || *k == '\'') {
+	     if (iswspace(*k) || *k == '\\' || *k=='\"' || *k == '\'') {
 
 		return _write_term_escaped(term, f);       		       
 	     }
      	}
-	if (fprintf(f, term) != strlen(term)) {
-		logerr("Cannot write term '%s'", term);
+	if (fwprintf(f, term) != wcslen(term)) {
+		logerr(L"Cannot write term '%s'", term);
 		return -5;
 	}
 	return 0;
@@ -271,19 +275,19 @@ int _write_statement(_Statement* stmt, FILE* f) {
 		int i;
 		for(i = 0; i < STATEMENT_SIZE; i++ ) {
 			if (i != 0 ) {
-				if ( fprintf(f, " ") != 1)  {
-					logerr("Cannot write whitespace");
+				if ( fwprintf(f, L" ") != 1)  {
+					logerr(L"Cannot write whitespace");
 					return -5;
 				}
 			}
 
 			if ( _write_term(stmt->term[i], f)){
-				logerr("Cannot write term %d", i);
+				logerr(L"Cannot write term %d", i);
 				return -1;
 			}
 		}
-		if ( fprintf(f, "\n") != 1) {
-			logerr("Cannot finish statement");
+		if ( fwprintf(f, L"\n") != 1) {
+			logerr(L"Cannot finish statement");
 			return -6;
 		}
 		return _write_statement(stmt->next, f);
@@ -299,7 +303,7 @@ int tst_save(TStorage* ts, const char* filename) {
 	_Statement* current = ts->statements;
 	f = fopen(filename, "w+");
 	if ( !f ) {
-		logerr("Cannot open file for write");
+		logerr(L"Cannot open file for write");
 		return -1;
 	}
 	err = _write_statement(current, f);
@@ -316,7 +320,7 @@ int _insert_statement(_Statement** cur, Statement stmt) {
 		}
 		memset(*cur, 0, sizeof(_Statement));
 		for( k = 0; k < STATEMENT_SIZE; k++ ) {
-			(*cur)->term[k] = strdup(stmt[k]);
+			(*cur)->term[k] = wcsdup(stmt[k]);
 		}
 		return 0;
 	} else 	{
@@ -332,7 +336,7 @@ int _insert_statement(_Statement** cur, Statement stmt) {
 int _remove_statement(_Statement** cur, Statement stmt) {
 	if ( *cur) { 
 		_Statement** next = &(*cur)->next;
-		fprintf(stderr, "Removing statement <%s, %s, %s, %s> \n", (*cur)->term[0], (*cur)->term[1], (*cur)->term[2], (*cur)->term[3]);
+		fwprintf(stderr, L"Removing statement <%s, %s, %s, %s> \n", (*cur)->term[0], (*cur)->term[1], (*cur)->term[2], (*cur)->term[3]);
 		if ( !stmt_match(*cur, stmt) ) {
 			// at least one term differ -> skip
 			return _remove_statement(next, stmt);
@@ -381,7 +385,7 @@ int tst_get(TStorage* ts, Statement mask, StatementResult rs, void* data) {
 
 }	
 int tst_destroy(TStorage* ts) { 
-	logerr("Triple storage destroyed");
+	logerr(L"Triple storage destroyed");
 	_stmt_destroy(ts->statements, 1);
 	free(ts);
 	return 0;

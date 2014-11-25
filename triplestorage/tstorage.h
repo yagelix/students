@@ -1,10 +1,12 @@
 #ifndef _TSTORAGE_H_
 #define _TSTORAGE_H_
+#include <wchar.h>
 
 #define STATEMENT_SIZE 4
 
+
 typedef struct _tstorage TStorage;
-typedef const char* Statement[STATEMENT_SIZE]; /* c,s,p,o */
+typedef const wchar_t* Statement[STATEMENT_SIZE]; /* c,s,p,o */
 
 typedef int (*StatementResult)(Statement stmt, void* data);
 
