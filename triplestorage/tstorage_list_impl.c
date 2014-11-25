@@ -255,9 +255,9 @@ int _write_term(const char* term, FILE* f) {
 	for (k = term; *k; k++ ) {
 	     if (isspace(*k) || *k == '\\' || *k=='\"' || *k == '\'') {
 
-		return _write_term_escaped(term, f);       		       
+			return _write_term_escaped(term, f);       		       
 	     }
-     	}
+    }
 	if (fprintf(f, term) != strlen(term)) {
 		logerr("Cannot write term '%s'", term);
 		return -5;
@@ -332,7 +332,6 @@ int _insert_statement(_Statement** cur, Statement stmt) {
 int _remove_statement(_Statement** cur, Statement stmt) {
 	if ( *cur) { 
 		_Statement** next = &(*cur)->next;
-		fprintf(stderr, "Removing statement <%s, %s, %s, %s> \n", (*cur)->term[0], (*cur)->term[1], (*cur)->term[2], (*cur)->term[3]);
 		if ( !stmt_match(*cur, stmt) ) {
 			// at least one term differ -> skip
 			return _remove_statement(next, stmt);

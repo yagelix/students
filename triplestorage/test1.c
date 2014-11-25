@@ -31,7 +31,7 @@ int main() {
 		__log ( "Error while setting %d", err);
 	}
 
-	stmt_init(&stmt, "A", "rama", "byla", "Very white");
+	stmt_init(&stmt, "A", "rama", "byla\"", "Very white");
 	if ((err = tst_set(st, stmt))) {
 		__log ( "Error while setting %d", err);
 	}
