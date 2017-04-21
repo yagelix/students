@@ -71,7 +71,7 @@
 				  (len (caddr args))
 				  (gen (make-generator channel freq amp len)))
 			 ;; and start note
-             (set! genlist (cons gen genlist))))
+			 (set! genlist (cons gen genlist))))
 		  ((instrument)
 		   ;; change instrument
 		   (display "Changing instrument...\n")
