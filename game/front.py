@@ -46,9 +46,11 @@ class Situation:
     
         
 class Front(Board):
-    def __init__(self, width, height, players_num):
+    def __init__(self, width, height, players_num, left_player=Soldier, right_player=Soldier):
         """Initializes game board  with width and height,
         adds players_num playes on both sides
+        addional parameters left_player and right_player can be set
+        to different subclasses of Player's
         """
         Board.__init__(self)
         self.width = width
@@ -195,7 +197,12 @@ class Front(Board):
                 player.x, player.y = x, y
                 return True
         return False
-    
+
+import random
+
+def lim(x):
+    return -1 if x < -0.5 else 1 if x > 0.5 else 0
+
 
 class Soldier(Player):
     def __init__(self, x, y, role):
@@ -203,23 +210,28 @@ class Soldier(Player):
         self.y = y
         self.health = 10
         self.role = role
-
-
+        self.g = 1 if self.role == 'left' else -1
+        self.dirx = self.g
+        self.diry = self.g
     def select_dir(self, sit):
         inf = float('inf')
         weight = lambda n: inf if sit.to_front[n] is None else \
-                 sit.to_front[n] + (sit.ours[n]  - sit.enemies[n])
+                 abs(n-1) + sit.to_front[n] + 3* (sit.ours[n]  - sit.enemies[n])
 
         sorted_pos = sorted(range(3), key=weight)
+        #self.diry = 1 - sorted_pos[0]
+        if abs(self.dirx)< 0.03:
+            self.dirx = -2*self.g
+        self.dirx += self.g
+        dx, dy = lim(self.dirx), 0 if lim(self.dirx) else self.diry
+        if sit.radar[1+dy][1+dx] != ' ':
+            self.dirx *= -0.9
+        
+        if dy:
+            if sit.radar[1+dy][1] == '#':
+                self.diry *= -1
 
-        self.dirx = 1 if self.role == 'left' else -1
-        self.diry = 1 - sorted_pos[0]
-        if self.diry:
-            if sit.radar[1+self.diry][1] != ' ':
-                self.dirx = -self.dirx
-        if sit.radar[1][1+self.dirx] != ' ':
-            self.dirx = 0
-
+        print("pos for %s player: " % self.role + " ".join("%s: %s" % (x, weight(x)) for x in sorted_pos) + " dir: %f %d" % (self.dirx, self.diry))
     def step(self):
         pass
 
@@ -229,10 +241,10 @@ class Soldier(Player):
         #
         #
         self.select_dir(sit)
-        self.board.move(self, self.dirx, self.diry)
+        self.board.move(self, lim(self.dirx), 0 if lim(self.dirx) else lim(self.diry))
        
 
-game  = Front(50, 25, 12)
+game  = Front(50, 25, 12, left_player=Soldier, right_player=Soldier)
 game.update_ui()
 while 1:
     game.try_step()
